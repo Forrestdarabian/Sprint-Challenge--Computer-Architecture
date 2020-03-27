@@ -2,6 +2,10 @@
 
 import sys
 
+lesstf = 0b100
+greatertf = 0b010
+equaltf = 0b001
+
 
 class CPU:
     """Main CPU class."""
@@ -10,8 +14,9 @@ class CPU:
         """Construct a new CPU."""
         self.ram = [0] * 256
         self.reg = [0] * 8
-        self.reg[7] = 0xFF
-        self.pc = self.reg[0]
+        self.pc = 0
+        self.flags = 0b00000001
+        self.running = True
         self.commands = {
             0b00000001: self.hlt,
             0b10000010: self.ldi,
@@ -25,6 +30,25 @@ class CPU:
             0b10100111: self.cmp
         }
 
+    def cmp(self, oper_a, oper_b):
+        self.alu('CMP', oper_a, oper_b)
+        self.pc += 3
+
+    def jmp(self, oper_a, oper_b):
+        self.pc = self.reg[oper_a]
+
+    def jeq(self, oper_a, oper_b):
+        if self.flags & equaltf:
+            self.pc = self.reg[oper_a]
+        else:
+            self.pc += 2
+
+    def jne(self, oper_a, oper_b):
+        if not self.flags & equaltf:
+            self.pc = self.reg[oper_a]
+        else:
+            self.pc += 2
+
     def ram_read(self, address):
         return self.ram[address]
 
@@ -32,7 +56,7 @@ class CPU:
         self.ram[address] = value
 
     def hlt(self, operand_a, operand_b):
-        return (0, False)
+        self.running = False
 
     def ldi(self, operand_a, operand_b):
         self.reg[operand_a] = operand_b
@@ -60,40 +84,33 @@ class CPU:
         self.reg[7] += 1
         return (2, True)
 
-    def load(self, file_name):
+    def load(self):
         """Load a program into memory."""
-
         address = 0
-
-        with open(file_name) as f:
-            lines = f.readlines()
-            lines = [line for line in lines if line.startswith(
-                '0') or line.startswith('1')]
-            program = [int(line[:8], 2) for line in lines]
-
-        # program = [
-        #     # From print8.ls8
-        #     0b10000010, # LDI R0,8
-        #     0b00000000,
-        #     0b00001000,
-        #     0b01000111, # PRN R0
-        #     0b00000000,
-        #     0b00000001, # HLT
-        # ]
-
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
+        with open(sys.argv[1]) as f:
+            for line in f:
+                # Ignore comments
+                comment_split = line.split("#")
+                num = comment_split[0].strip()
+                if num == "":
+                    continue  # Ignore blank lines
+                instruction = int(num, 2)  # Base 10, but ls-8 is base 2
+                self.ram[address] = instruction
+                address += 1
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
-
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        # elif op == "SUB":
         elif op == "MUL":
-            self.reg[reg_a] = (self.reg[reg_a] * self.reg[reg_b])
-
+            self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.flags = lesstf
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.flags = greatertf
+            else:
+                self.flags = equaltf
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -119,25 +136,12 @@ class CPU:
 
     def run(self):
         """Run the CPU."""
-        running = True
-
-        debug_cnt = 0
-        while running:
-
-            debug_cnt = debug_cnt + 1
-
-            ir = self.ram[self.pc]
-
-            operand_a = self.ram_read(self.pc + 1)
-            operand_b = self.ram_read(self.pc + 2)
-
-            try:
-
-                operation_output = self.commands[ir](operand_a, operand_b)
-                running = operation_output[1]
-                self.pc += operation_output[0]
-
-            except Exception as e:
-                print(e)
-                print(f"command: {ir}")
-                sys.exit()
+        while self.running:
+            IR = self.ram_read(self.pc)
+            oper_a = self.ram_read(self.pc + 1)
+            oper_b = self.ram_read(self.pc + 2)
+            if int(bin(IR), 2) in self.commands:
+                self.commands[IR](oper_a, oper_b)
+            else:
+                raise Exception(
+                    f'Invalid {IR}')
