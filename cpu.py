@@ -131,6 +131,10 @@ class CPU:
                 self.ram[address] = instruction
                 address += 1
 
+
+# ALU operations for add, mul, and cmp + equal flag
+
+
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
         if op == "ADD":
