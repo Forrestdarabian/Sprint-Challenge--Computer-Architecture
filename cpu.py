@@ -2,9 +2,30 @@
 
 import sys
 
+
 lesstf = 0b100
 greatertf = 0b010
 equaltf = 0b001
+SP = 7
+
+
+# Defining Binary CPU Functionality
+
+
+HLT = 0b00000001
+LDI = 0b10000010
+PRN = 0b01000111
+ADD = 0b10100000
+MUL = 0b10100010
+PUSH = 0b01000101
+POP = 0b01000110
+CMP = 0b10100111
+JMP = 0b01010100
+JEQ = 0b01010101
+JNE = 0b01010110
+
+
+# Constructing new CPU using previous definitions
 
 
 class CPU:
@@ -15,74 +36,86 @@ class CPU:
         self.ram = [0] * 256
         self.reg = [0] * 8
         self.pc = 0
-        self.flags = 0b00000001
         self.running = True
+        self.flags = 0b00000001
         self.commands = {
-            0b00000001: self.hlt,
-            0b10000010: self.ldi,
-            0b01000111: self.prn,
-            0b10100010: self.mul,
-            0b01000101: self.push,
-            0b01000110: self.pop,
-            0b01010100: self.jmp,
-            0b01010101: self.jeq,
-            0b01010110: self.jne,
-            0b10100111: self.cmp
+            HLT: self.HLT,
+            LDI: self.LDI,
+            PRN: self.PRN,
+            ADD: self.ADD,
+            MUL: self.MUL,
+            PUSH: self.PUSH,
+            POP: self.POP,
+            CMP: self.CMP,
+            JMP: self.JMP,
+            JEQ: self.JEQ,
+            JNE: self.JNE
         }
 
-    def cmp(self, oper_a, oper_b):
+
+# Defining all of our instructions
+
+
+    def HLT(self, oper_a, oper_b):
+        self.running = False
+
+    def LDI(self, oper_a, oper_b):
+        self.reg[oper_a] = oper_b
+        self.pc += 3
+
+    def PRN(self, oper_a, oper_b):
+        print(self.reg[oper_a])
+        self.pc += 2
+
+    def ADD(self, oper_a, oper_b):
+        self.alu('ADD', oper_a, oper_b)
+        self.pc += 3
+
+    def MUL(self, oper_a, oper_b):
+        self.alu('MUL', oper_a, oper_b)
+        self.pc += 3
+
+    def PUSH(self, oper_a, oper_b):
+        self.push(self.reg[oper_a])
+        self.pc += 2
+
+    def POP(self, oper_a, oper_b):
+        self.reg[oper_a] = self.pop()
+        self.pc += 2
+
+    def CMP(self, oper_a, oper_b):
         self.alu('CMP', oper_a, oper_b)
         self.pc += 3
 
-    def jmp(self, oper_a, oper_b):
+    def JMP(self, oper_a, oper_b):
         self.pc = self.reg[oper_a]
 
-    def jeq(self, oper_a, oper_b):
+    def JEQ(self, oper_a, oper_b):
         if self.flags & equaltf:
             self.pc = self.reg[oper_a]
         else:
             self.pc += 2
 
-    def jne(self, oper_a, oper_b):
+    def JNE(self, oper_a, oper_b):
         if not self.flags & equaltf:
             self.pc = self.reg[oper_a]
         else:
             self.pc += 2
+
+    def push(self, value):
+        self.reg[SP] -= 1
+        self.ram_write(value, self.reg[7])
+
+    def pop(self):
+        value = self.ram_read(self.reg[7])
+        self.reg[SP] += 1
+        return value
 
     def ram_read(self, address):
         return self.ram[address]
 
     def ram_write(self, value, address):
         self.ram[address] = value
-
-    def hlt(self, operand_a, operand_b):
-        self.running = False
-
-    def ldi(self, operand_a, operand_b):
-        self.reg[operand_a] = operand_b
-        return (3, True)
-
-    def prn(self, operand_a, operand_b):
-        print(self.reg[operand_a])
-        return (2, True)
-
-    def mul(self, operand_a, operand_b):
-        self.alu("MUL", operand_a, operand_b)
-        return (3, True)
-
-    def push(self, operand_a, operand_b):
-        self.reg[7] -= 1
-        sp = self.reg[7]
-        value = self.reg[operand_a]
-        self.ram[sp] = value
-        return (2, True)
-
-    def pop(self, operand_a, operand_b):
-        sp = self.reg[7]
-        value = self.ram[sp]
-        self.reg[operand_a] = value
-        self.reg[7] += 1
-        return (2, True)
 
     def load(self):
         """Load a program into memory."""
